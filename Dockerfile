@@ -15,7 +15,7 @@ RUN pub get --offline
 # We install unzip and remove the apt-index again to keep the
 # docker image diff small.
 RUN apt-get update && \
-  apt-get install -y unzip && \
+  apt-get install -y unzip tar bzip2 && \
   cp -a third_party/pkg ../pkg && \
   rm -rf /var/lib/apt/lists/*
 

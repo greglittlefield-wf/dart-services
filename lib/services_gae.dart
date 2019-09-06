@@ -8,6 +8,7 @@ import 'dart:async';
 import 'dart:io' as io;
 
 import 'package:appengine/appengine.dart' as ae;
+import 'package:dart_services/src/dart_tool_cache.dart';
 import 'package:logging/logging.dart';
 import 'package:rpc/rpc.dart' as rpc;
 
@@ -70,15 +71,13 @@ class GaeServer {
 
     discoveryEnabled = false;
     fileRelayServer = FileRelayServer();
-    flutterWebManager = FlutterWebManager(sdkPath);
-    commonServer = CommonServer(
-        sdkPath,
-        flutterWebManager,
-        GaeServerContainer(),
-        redisServerUri == null
-            ? InMemoryCache()
-            : RedisCache(
-                redisServerUri, io.Platform.environment['GAE_VERSION']));
+    final cache = redisServerUri == null
+        ? InMemoryCache()
+        : RedisCache(redisServerUri, io.Platform.environment['GAE_VERSION']);
+    flutterWebManager =
+        FlutterWebManager(sdkPath, dartToolCache: DartToolCache(cache));
+    commonServer =
+        CommonServer(sdkPath, flutterWebManager, GaeServerContainer(), cache);
     // Enabled pretty printing of returned json for debuggability.
     apiServer = rpc.ApiServer(apiPrefix: _API, prettyPrint: true)
       ..addApi(commonServer)

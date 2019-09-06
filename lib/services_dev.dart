@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:args/args.dart';
+import 'package:dart_services/src/dart_tool_cache.dart';
 import 'package:logging/logging.dart';
 import 'package:rpc/rpc.dart';
 import 'package:shelf/shelf.dart';
@@ -124,9 +125,11 @@ class EndpointsServer {
   EndpointsServer._(String sdkPath, this.port) {
     discoveryEnabled = false;
 
-    flutterWebManager = FlutterWebManager(sdkPath);
+    final cache = InMemoryCache();
+
+    flutterWebManager = FlutterWebManager(sdkPath, dartToolCache: DartToolCache(cache));
     commonServer =
-        CommonServer(sdkPath, flutterWebManager, _ServerContainer(), _Cache());
+        CommonServer(sdkPath, flutterWebManager, _ServerContainer(), cache);
     commonServer.init();
 
     apiServer = ApiServer(apiPrefix: '/api', prettyPrint: true)

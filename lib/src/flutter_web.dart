@@ -5,10 +5,12 @@
 import 'dart:io';
 import 'dart:typed_data' show Uint8List;
 
+import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as path;
 
+import 'dart_tool_cache.dart';
 import 'sdk_manager.dart';
 
 Logger _logger = Logger('flutter_web');
@@ -16,12 +18,15 @@ Logger _logger = Logger('flutter_web');
 /// Handle provisioning package:flutter_web and related work.
 class FlutterWebManager {
   final String sdkPath;
+  final DartToolCache dartToolCache;
 
   Directory _projectDirectory;
 
   bool _initedFlutterWeb = false;
+  Set<Digest> _knownCacheHashes = {};
+  Digest _currentDartToolDigest;
 
-  FlutterWebManager(this.sdkPath) {
+  FlutterWebManager(this.sdkPath, {this.dartToolCache}) {
     _projectDirectory = Directory.systemTemp.createTempSync('dartpad');
     _init();
   }
@@ -82,6 +87,59 @@ $_samplePackageName:lib/
 
     _initedFlutterWeb = true;
   }
+
+  Future<void> loadDartToolCache() async {
+    if (dartToolCache == null) return;
+
+    final digest = dependenciesDigest;
+
+    if (_currentDartToolDigest == digest) {
+     _logger.info('.dart_tool in project folder is up to date; skipping cache lookup');
+     return;
+   }
+
+    if (_currentDartToolDigest == null) {
+      _logger.info('.dart_tool does not exist; looking up in cache');
+    } else {
+      _logger.info('.dart_tool is out of date; looking up in cache');
+    }
+
+    final watch = Stopwatch()..start();
+    final entry = await dartToolCache.get(dependenciesDigest);
+    if (entry == null) {
+      _logger.info('No cache found');
+    } else {
+      _logger.info('Cache found; took ${watch.elapsedMilliseconds}ms. Extracting..');
+      watch.reset();
+
+      await entry.extractTo(path.join(_projectDirectory.path, '.dart_tool'));
+      _logger.info('Extracted; took ${watch.elapsedMilliseconds}ms.');
+      _knownCacheHashes.add(entry.dependenciesDigest);
+    }
+  }
+
+  Future<void> storeDartToolCache() async {
+    if (dartToolCache == null) return;
+
+    final digest = dependenciesDigest;
+
+    _currentDartToolDigest = digest;
+    // Already cached, don't attempt to store it again
+    if (_knownCacheHashes.contains(digest)) {
+      _logger.info('.dart_tool has already been cached');
+      return;
+    }
+
+    _logger.info('Storing .dart_tool cache...');
+    final watch = Stopwatch()..start();
+    await dartToolCache.store(await DartToolCacheEntry.from(digest, dartToolPath));
+    watch.stop();
+    _logger.info('Done storing .dart_tool cache; took ${watch.elapsedMilliseconds}ms.');
+    _knownCacheHashes.add(digest);
+  }
+
+  Digest get dependenciesDigest => digestPubspec(File(path.join(_projectDirectory.path, 'pubspec.yaml')).readAsStringSync());
+  String get dartToolPath => path.join(_projectDirectory.path, '.dart_tool');
 
   String get summaryFilePath {
     return path.join(_projectDirectory.path, 'flutter_web.sum');

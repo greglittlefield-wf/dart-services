@@ -6,6 +6,7 @@
 library services.compiler;
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:bazel_worker/driver.dart';
@@ -66,6 +67,8 @@ class Compiler {
     Directory temp = Directory.systemTemp.createTempSync('dartpad');
 
     try {
+      await flutterWebManager.loadDartToolCache();
+
       List<String> arguments = <String> ['run', 'build_runner',
       'build', '-r', '-o${temp.path}'];
 //      if (!returnSourceMap) arguments.add('--no-source-maps');
@@ -88,19 +91,40 @@ class Compiler {
 
       final String pubPath = path.join(sdkPath, 'bin', 'pub');
 
-      _logger.info('About to exec: $pubPath $arguments');
+      final buildLogger = new Logger(_logger.name + '.build_runner');
+      buildLogger.info('Running `$pubPath ${arguments.join(' ')}`'
+          ' in ${flutterWebManager.projectDirectory.path}');
 
-      ProcessResult result = Process.runSync(pubPath, arguments, workingDirectory:
+      final watch = new Stopwatch()..start();
+      final process = await Process.start(pubPath, arguments, workingDirectory:
           flutterWebManager.projectDirectory.path);
+
+      final stderr = new StringBuffer();
+      process.stderr
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen((line) {
+            buildLogger.warning(line);
+            stderr.writeln(line);
+      });
+      process.stdout
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .listen(buildLogger.info);
+
+      watch.stop();
 
 //      ProcessResult result =
 //          Process.runSync(dart2JSPath, arguments, workingDirectory: temp.path);
 
-      if (result.exitCode != 0) {
-        _logger.warning(result.stderr);
+      final exitCode = await process.exitCode;
+      buildLogger.info('Exited with code $exitCode');
+      buildLogger.info('took ${watch.elapsedMilliseconds}ms');
+
+      if (exitCode != 0) {
         final CompilationResults results =
             CompilationResults(problems: <CompilationProblem>[
-          CompilationProblem._(result.stdout as String),
+          CompilationProblem._(stderr.toString()),
         ]);
         return results;
       } else {
@@ -112,6 +136,9 @@ class Compiler {
           compiledJS: mainJs.readAsStringSync(),
           sourceMap: sourceMap,
         );
+
+        await flutterWebManager.storeDartToolCache();
+
         return results;
       }
     } catch (e, st) {
