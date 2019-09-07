@@ -81,6 +81,3 @@ class DartToolCacheEntry {
     return new DartToolCacheEntry(dependenciesDigest, base64Encode(compressResult.stdout as List<int>));
   }
 }
-
-
-Digest digestPubspec(String pubspecYaml) => utf8.encoder.fuse(sha256).convert(pubspecYaml);

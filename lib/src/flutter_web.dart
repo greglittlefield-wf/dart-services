@@ -138,7 +138,10 @@ $_samplePackageName:lib/
     _knownCacheHashes.add(digest);
   }
 
-  Digest get dependenciesDigest => digestPubspec(File(path.join(_projectDirectory.path, 'pubspec.yaml')).readAsStringSync());
+  Digest get dependenciesDigest {
+    final pubspecLock = File(path.join(_projectDirectory.path, 'pubspec.lock')).readAsStringSync();
+    return utf8.encoder.fuse(sha256).convert(pubspecLock);
+  }
   String get dartToolPath => path.join(_projectDirectory.path, '.dart_tool');
 
   String get summaryFilePath {
