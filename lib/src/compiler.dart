@@ -90,14 +90,15 @@ class Compiler {
 //      final String dart2JSPath = path.join(sdkPath, 'bin', 'dart2js');
 
       final String pubPath = path.join(sdkPath, 'bin', 'pub');
+      final workingDirectory = flutterWebManager.projectDirectory.path;
 
       final buildLogger = new Logger(_logger.name + '.build_runner');
       buildLogger.info('Running `$pubPath ${arguments.join(' ')}`'
-          ' in ${flutterWebManager.projectDirectory.path}');
+          ' in $workingDirectory');
 
       final watch = new Stopwatch()..start();
       final process = await Process.start(pubPath, arguments, workingDirectory:
-          flutterWebManager.projectDirectory.path);
+          workingDirectory);
 
       final stderr = new StringBuffer();
       process.stderr
@@ -128,6 +129,9 @@ class Compiler {
         ]);
         return results;
       } else {
+        // Run a second time so to work around https://github.com/dart-lang/build/pull/2436
+        Process.runSync(pubPath, arguments, workingDirectory: workingDirectory);
+
         String sourceMap;
         if (returnSourceMap && mainSourceMap.existsSync()) {
           sourceMap = mainSourceMap.readAsStringSync();
