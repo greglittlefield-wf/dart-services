@@ -58,7 +58,23 @@ void main(List<String> args) {
 
   Logger.root.level = Level.FINER;
   Logger.root.onRecord.listen((LogRecord record) {
-    print(record);
+    var message = record.message;
+    final loggerName = record.loggerName;
+    final level = record.level;
+
+    // Truncate long responses containing dart2js output
+    const prefix = '\nResponse\n  Status Code: 200';
+    const bodyPattern = 'Body:\n    {result: {}(function dartProgram(){';
+    if (loggerName == 'rpc' &&
+        level < Level.WARNING &&
+        message.startsWith(prefix) &&
+        message.contains(bodyPattern)) {
+      message =
+          '${message.substring(0, message.indexOf(bodyPattern) + bodyPattern.length)}'
+          ' (logs for dart2js response truncated...)';
+    }
+
+    print('[${level.name}] $loggerName: $message');
     if (record.stackTrace != null) print(record.stackTrace);
   });
 
