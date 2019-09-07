@@ -52,7 +52,7 @@ class DartToolCacheEntry {
 
     Process decompress;
     try {
-      decompress = await Process.start('sh', ['-c', 'bzip2 --decompress - | tar -x -f - -C "$dartToolPath"']);
+      decompress = await Process.start('sh', ['-c', 'lz4 --decompress --stdout | tar -x -f - -C "$dartToolPath"']);
       decompress.stderr.transform(utf8.decoder).transform(new LineSplitter()).listen(_logger.warning);
       decompress.stdin.add(base64Decode(value));
       await decompress.stdin.flush();
@@ -73,7 +73,7 @@ class DartToolCacheEntry {
       throw new ArgumentError('Must be uploaded from a .dart_tool directory');
     }
 
-    final compressResult = await Process.run('sh', ['-c', 'tar -c -f - -C "$dartToolPath" . | bzip2 -9 -'], stdoutEncoding: null);
+    final compressResult = await Process.run('sh', ['-c', 'tar -c -f - -C "$dartToolPath" . | lz4 --compress --stdout'], stdoutEncoding: null);
     if (compressResult.exitCode != 0) {
       throw new Exception('Error compressing .dart_tool ${compressResult.stderr}');
     }
